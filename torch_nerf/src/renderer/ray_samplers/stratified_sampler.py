@@ -65,7 +65,34 @@ class StratifiedSampler(RaySamplerBase):
 
         # TODO
         # HINT: Freely use the provided methods 'create_t_bins' and 'map_t_to_euclidean'
-        raise NotImplementedError("Task 2")
+
+        # 1) pick device
+        device = ray_bundle.origins.device
+
+        # 2) build (num_sample+1) equally spaced bins in [0,1]
+        #    e.g. if num_sample=4, we get [0, .25, .5, .75, 1.0]
+        t_bins = self.create_t_bins(num_sample + 1, device)  # shape [num_sample+1]
+        lower, upper = t_bins[:-1], t_bins[1:]                # each [num_sample]
+
+        # 3) draw one random u∼U[0,1) per ray, per bin
+        num_rays = ray_bundle.origins.shape[0]
+        u = torch.rand(num_rays, num_sample, device=device)  # [num_rays, num_sample]
+
+        # 4) compute normalized depths within each bin:
+        #    t_norm[i,j] = lower[j] + u[i,j] * (upper[j]-lower[j])
+        t_norm = lower.unsqueeze(0) + u * (upper - lower).unsqueeze(0)
+        #    → shape [num_rays, num_sample]
+
+        # 5) map [0,1] → [t_near, t_far]
+        #    RayBundle.nears / fars have shape [num_rays, 1],
+        #    but our map_t_to_euclidean expects scalar near/far.
+        #    We assume near/far constant across the bundle, so:
+        near = float(ray_bundle.nears[0, 0])
+        far  = float(ray_bundle.fars[0, 0])
+        t_euc = self.map_t_to_euclidean(t_norm, near, far)
+        #    → shape [num_rays, num_sample]
+
+        return t_euc
 
     @jaxtyped
     @typechecked
