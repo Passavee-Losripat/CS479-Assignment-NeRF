@@ -43,4 +43,30 @@ class QuadratureIntegrator(IntegratorBase):
         """
         # TODO
         # HINT: Look up the documentation of 'torch.cumsum'.
-        raise NotImplementedError("Task 3")
+        # 1) compute “optical thickness” per sample:
+        #    σ_i · Δ_i
+        sigma_delta = sigma * delta  # shape: [num_ray, num_sample]
+
+        # 2) alpha_i = 1 − exp(−σ_i Δ_i)
+        alpha = 1.0 - torch.exp(-sigma_delta)  # [num_ray, num_sample]
+
+        # 3) cumulative sum of σ_j Δ_j up to (but excluding) the current i:
+        #    S_i = ∑_{j=1}^{i−1} σ_j Δ_j
+        #    we do this by cumsum and then shifting right by one, padding zero at front
+        cum_sigma_delta = torch.cumsum(sigma_delta, dim=-1)
+        # pad a column of zeros at the beginning and drop the last cum:
+        zeros = torch.zeros_like(cum_sigma_delta[:, :1])
+        tau = torch.cat([zeros, cum_sigma_delta[:, :-1]], dim=-1)  # [num_ray, num_sample]
+
+        # 4) transmittance T_i = exp(−S_i)
+        transmittance = torch.exp(-tau)  # [num_ray, num_sample]
+
+        # 5) per-sample weight w_i = T_i · α_i
+        weights = transmittance * alpha  # [num_ray, num_sample]
+
+        # 6) final pixel color is weighted sum of radiance:
+        #    Ĉ(r) = ∑_i w_i · c_i
+        #    note: radiance has shape [num_ray, num_sample, 3]
+        rgbs = torch.sum(weights.unsqueeze(-1) * radiance, dim=1)  # [num_ray, 3]
+
+        return rgbs, weights
