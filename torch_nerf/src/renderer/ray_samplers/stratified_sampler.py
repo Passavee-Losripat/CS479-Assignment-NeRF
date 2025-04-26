@@ -87,8 +87,8 @@ class StratifiedSampler(RaySamplerBase):
         #    RayBundle.nears / fars have shape [num_rays, 1],
         #    but our map_t_to_euclidean expects scalar near/far.
         #    We assume near/far constant across the bundle, so:
-        near = float(ray_bundle.nears[0, 0])
-        far  = float(ray_bundle.fars[0, 0])
+        near = float(ray_bundle.nears[0])
+        far  = float(ray_bundle.fars[0])
         t_euc = self.map_t_to_euclidean(t_norm, near, far)
         #    → shape [num_rays, num_sample]
 
