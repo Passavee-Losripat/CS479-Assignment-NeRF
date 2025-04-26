@@ -35,7 +35,32 @@ class NeRF(nn.Module):
         super().__init__()
 
         # TODO
-        raise NotImplementedError("Task 1")
+        self.pos_dim = pos_dim
+        self.view_dir_dim = view_dir_dim
+        self.feat_dim = feat_dim
+
+        # Input + 9 FC layers with ReLU, skip at layer 5 (i=4)
+        self.layers = nn.ModuleList()
+        for i in range(10):  # input + 9 layers
+            in_dim = pos_dim if i == 0 else feat_dim
+            if i == 5:
+                in_dim += pos_dim  # Skip connection
+            self.layers.append(nn.Linear(in_dim, feat_dim))
+
+        # Output head: density and feature
+        self.density_layer = nn.Sequential(
+            nn.Linear(feat_dim, 1),
+            nn.ReLU()
+        )
+        self.feature_layer = nn.Linear(feat_dim, feat_dim)
+
+        # RGB head
+        self.view_fc = nn.Sequential(
+            nn.Linear(feat_dim + view_dir_dim, feat_dim // 2),
+            nn.ReLU(),
+            nn.Linear(feat_dim // 2, 3),
+            nn.Sigmoid()
+        )
 
     @jaxtyped
     @typechecked
@@ -60,4 +85,17 @@ class NeRF(nn.Module):
         """
 
         # TODO
-        raise NotImplementedError("Task 1")
+        x = pos
+        for i, layer in enumerate(self.layers):
+            if i == 5:
+                x = torch.cat([x, pos], dim=-1)  # Skip connection
+            x = torch.relu(layer(x))
+
+        sigma = self.density_layer(x)         # Shape: [N, 1]
+        feature = self.feature_layer(x)       # Shape: [N, feat_dim]
+
+        # RGB output using view direction
+        h = torch.cat([feature, view_dir], dim=-1)
+        rgb = self.view_fc(h)                 # Shape: [N, 3]
+
+        return sigma, rgb
