@@ -43,7 +43,7 @@ class NeRF(nn.Module):
         self.layers = nn.ModuleList()
         for i in range(10):  # input + 9 layers
             in_dim = pos_dim if i == 0 else feat_dim
-            if i == 5:
+            if i == 4:
                 in_dim += pos_dim  # Skip connection
             self.layers.append(nn.Linear(in_dim, feat_dim))
 
@@ -87,7 +87,7 @@ class NeRF(nn.Module):
         # TODO
         x = pos
         for i, layer in enumerate(self.layers):
-            if i == 5:
+            if i == 4:
                 x = torch.cat([x, pos], dim=-1)  # Skip connection
             x = torch.relu(layer(x))
 
