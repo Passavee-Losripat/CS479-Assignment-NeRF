@@ -76,17 +76,39 @@ class RaySamples:
         Returns:
             coords: Coordinates of points sampled along rays in the ray bundle.
         """
-        origins: Float[torch.Tensor, "num_ray 3"] = self.ray_bundle.origins
-        directions: Float[torch.Tensor, "num_ray 3"] = self.ray_bundle.directions
-        t_samples: Float[torch.Tensor, "num_ray num_sample"] = self.t_samples
+
+        #origins: Float[torch.Tensor, "num_ray 3"] = self.ray_bundle.origins
+        #directions: Float[torch.Tensor, "num_ray 3"] = self.ray_bundle.directions
+        #t_samples: Float[torch.Tensor, "num_ray num_sample"] = self.t_samples
 
         # Reshape for broadcasting
-        origins = origins.unsqueeze(1)         # [num_ray, 1, 3]
-        directions = directions.unsqueeze(1)   # [num_ray, 1, 3]
-        t_samples = t_samples.unsqueeze(-1)    # [num_ray, num_sample, 1]
+        #origins = origins.unsqueeze(1)         # [num_ray, 1, 3]
+        #directions = directions.unsqueeze(1)   # [num_ray, 1, 3]
+        #t_samples = t_samples.unsqueeze(-1)    # [num_ray, num_sample, 1]
 
         # Compute sampled coordinates
-        coords = origins + t_samples * directions  # [num_ray, num_sample, 3]
+        #coords = origins + t_samples * directions  # [num_ray, num_sample, 3]
+        #return coords
+        origins = self.ray_bundle.origins            # [num_ray, 3]
+        directions = self.ray_bundle.directions      # [num_ray, 3]
+        t = self.t_samples                           # [num_ray, num_sample]
+
+        # compute the last interval per ray
+        delta_last = t[..., -1] - t[..., -2]          # [num_ray]
+        # new last t = last + that interval
+        new_t_last = t[..., -1] + delta_last         # [num_ray]
+        # append it
+        t_padded = torch.cat([t, new_t_last.unsqueeze(-1)], dim=-1)  # [num_ray, num_sample+1]
+        # override t_samples so compute_deltas sees this:
+        self.t_samples = t_padded
+
+        # ---- now compute coordinates ----
+        # reshape for broadcasting
+        o = origins.unsqueeze(1)                     # [num_ray, 1, 3]
+        d = directions.unsqueeze(1)                  # [num_ray, 1, 3]
+        t_exp = t_padded.unsqueeze(-1)               # [num_ray, num_sample+1, 1]
+
+        coords = o + t_exp * d                       # [num_ray, num_sample+1, 3]
         return coords
 
     @jaxtyped

@@ -45,7 +45,14 @@ class QuadratureIntegrator(IntegratorBase):
         # HINT: Look up the documentation of 'torch.cumsum'.
         # 1) compute “optical thickness” per sample:
         #    σ_i · Δ_i
-        sigma_delta = sigma * delta  # shape: [num_ray, num_sample]
+        #sigma_delta = sigma * delta  # shape: [num_ray, num_sample]
+        if delta.shape[-1] > 1:
+            med = delta[..., :-1].median(dim=-1).values    # [num_ray]
+            delta = torch.cat([
+                delta[..., :-1],
+                med.unsqueeze(-1)
+            ], dim=-1)                                     # [num_ray, num_sample]
+        sigma_delta = sigma * delta                        # [num_ray, num_sample]
 
         # 2) alpha_i = 1 − exp(−σ_i Δ_i)
         alpha = 1.0 - torch.exp(-sigma_delta)  # [num_ray, num_sample]
@@ -68,5 +75,7 @@ class QuadratureIntegrator(IntegratorBase):
         #    Ĉ(r) = ∑_i w_i · c_i
         #    note: radiance has shape [num_ray, num_sample, 3]
         rgbs = torch.sum(weights.unsqueeze(-1) * radiance, dim=1)  # [num_ray, 3]
+        acc = weights.sum(dim=1, keepdim=True)
+        rgbs = rgbs + (1.0 - acc)
 
         return rgbs, weights
