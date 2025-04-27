@@ -50,7 +50,7 @@ class NeRF(nn.Module):
         # Output head: density and feature
         self.density_layer = nn.Sequential(
             nn.Linear(feat_dim, 1),
-            nn.ReLU()
+            nn.Softplus()
         )
         self.feature_layer = nn.Linear(feat_dim, feat_dim)
 
